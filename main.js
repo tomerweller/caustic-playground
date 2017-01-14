@@ -9,12 +9,10 @@ const initScene = loadedScene => {
     scene = loadedScene;
     ball = scene.getObjectByName("Ball");
     ball.material.side = THREE.DoubleSide;
-    ballGeometry = new THREE.Geometry().fromBufferGeometry(ball.geometry);
-    ball.geometry = ballGeometry;
+    ballGeometry = ball.geometry;
 
     floor = scene.getObjectByName("Floor");
-    floorGeometry = new THREE.Geometry().fromBufferGeometry(floor.geometry);
-    floor.geometry = floorGeometry;
+    floorGeometry = floor.geometry;
     floor.material.vertexColors = THREE.FaceColors;
     // floor.material.side = THREE.DoubleSide;
 

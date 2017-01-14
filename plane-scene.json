@@ -19,8 +19,8 @@
 		{
 			"uuid": "FAC4813A-28CF-4CCB-89C1-6DB4EEC10FE6",
 			"type": "PlaneBufferGeometry",
-			"width": 60,
-			"height": 60,
+			"width": 30,
+			"height": 30,
 			"widthSegments": 150,
 			"heightSegments": 150
 		}],
@@ -32,7 +32,8 @@
 			"roughness": 0.5,
 			"metalness": 0.5,
 			"emissive": 13226599,
-			"opacity": 0.5,
+			"opacity": 0.8,
+			"transparent": true,
 			"depthFunc": 3,
 			"depthTest": true,
 			"depthWrite": true,
@@ -65,7 +66,7 @@
 				"name": "Ball",
 				"castShadow": true,
 				"receiveShadow": true,
-				"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,5,0,1],
+				"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,1.01,0,1],
 				"geometry": "5958A4F4-6ABC-437D-8AB5-BB3445F6AA8D",
 				"material": "C2E37E02-C032-49BC-84C6-DB58B2241672"
 			},
@@ -78,6 +79,7 @@
 				"color": 16777215,
 				"intensity": 1,
 				"distance": 0,
+
 				"decay": 1,
 				"shadow": {
 					"camera": {
