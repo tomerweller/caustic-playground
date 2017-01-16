@@ -64,46 +64,11 @@ const render = () => {
     renderer.render( scene, camera );
 };
 
-const RINDEX_AIR = 1;
-const RINDEX_GLASS = 1.52;
-const EQUALITY_THRESHEOLD = 0.01;
-
 const deg = (rad) => rad*(180/Math.PI);
 
 const log = console.log;
 
-const projectFacesBallBall = (f) => {
-    //face vertices, global
-
-    const vertices = f.vertexPositions.map(position => ({
-        position,
-        inLightDirection: position.clone().sub(light.position).normalize()
-    }));
-
-    const isFaceDirect = vertices.reduce((isTrue, v) => {
-        const isecs = raycast(light.position, v.inLightDirection, ball);
-        return isTrue && isecs.length>0 && isecs[0].point.distanceTo(v.position)<EQUALITY_THRESHEOLD;
-    }, true);
-
-    let faceProjections = [];
-
-    if (isFaceDirect) {
-        faceProjections = vertices.reduce( (prev, v) => {
-            const ray = refract(f.normal, v.inLightDirection.clone().multiplyScalar(-1), RINDEX_AIR, RINDEX_GLASS);
-            const isecs = raycast(v.position, ray, ball);
-            //we might only care about the furthest but taking all for now
-            const filteredIsecs = isecs.filter(isec => isec.distance>EQUALITY_THRESHEOLD);
-            return prev.concat(filteredIsecs.map(isec => ({face: isec.face, ray})));
-        }, []);
-    }
-
-    return faceProjections;
-};
-
-const testCalcFace = () => projectFacesBallBall(ballGeometry.faces[0]);
-
 const projectFacesBallWall = pf => {
-
     const vertices = [pf.face.a, pf.face.b, pf.face.c]
         .map(v => new THREE.Vector3().fromBufferAttribute( ball.geometry.attributes.position, v).add(ball.position));
 
@@ -113,31 +78,17 @@ const projectFacesBallWall = pf => {
         //we might only care about the furthest but taking all for now
         return prev.concat(isecs);
     }, []);
-
 };
 
-const getCausticMap = () => {
+const getCausticMap = (origin, refractive, receiver, outIOR, inIOR) => {
     const start = performance.now();
-    console.log("0", performance.now()-start);
-
-    let ballBallFaces = [];
-    for (face of faceIterator(ball.geometry, ball.position)) {
-        for (projectedFace of projectFacesBallBall(face)) {
-            ballBallFaces.push(projectedFace);
-        }
-    }
-
-    console.log("1", performance.now()-start);
-    let ballFloorFaces = [];
-    for (face of ballBallFaces) {
-        for (projectedFace of projectFacesBallWall(face)) {
-            ballFloorFaces.push(projectedFace);
-        }
-    }
-
+    console.log("0", performance.now() - start);
+    const  refractiveProjectedFaces = refractOnSelf(ball, origin, outIOR, inIOR);
+    console.log("1", performance.now() - start);
+    const receiverProjectedFaces = refractOnOther(refractiveProjectedFaces, refractive, receiver, inIOR, outIOR);
     console.log("2", performance.now()-start);
     const causticMap = {};
-    ballFloorFaces.forEach(f => {
+    receiverProjectedFaces.forEach(f => {
         if (!(f.faceIndex in causticMap)){
             causticMap[f.faceIndex] = 0;
         }
@@ -147,6 +98,7 @@ const getCausticMap = () => {
     return causticMap;
 };
 
+const getMainCausticMap = () => getCausticMap(light.position, ball, floor, RINDEX_AIR, RINDEX_GLASS);
 const applyCaustics = (causticMap, fnGetter) => {
     const max = Object.keys(causticMap).reduce((currMax,i) => {
         return causticMap[i]>currMax? causticMap[i]: currMax;
@@ -154,8 +106,6 @@ const applyCaustics = (causticMap, fnGetter) => {
 
     console.log("max is", max);
     const fn = fnGetter(max);
-
-    // floor.geometry.attributes.color = new BufferAttribute();
 
     const color = new Float32Array(floor.geometry.attributes.position.count*3);
     for(face of faceIterator(floor.geometry, floor.position)) {
