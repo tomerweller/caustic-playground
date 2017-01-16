@@ -14,15 +14,10 @@ const raycast = (origin, direction, mesh) => {
 
 const refract = (surfaceNormal, inRay, inIOR, outIOR) => {
   const theta1 = surfaceNormal.clone().angleTo(inRay); //+
-  // console.log("theta1 is", deg(theta1));
   const refractAngle = Math.asin((inIOR/outIOR)*Math.sin(theta1)); //+
-  // console.log("refract angle", deg(refractAngle));
   const reverseSurfaceNormal = surfaceNormal.clone().multiplyScalar(-1);
-  // console.log("reverse surface normal", reverseSurfaceNormal);
   const rotationAxis = surfaceNormal.clone().cross(inRay).normalize();
-  // console.log("rotation axis is", rotationAxis);
   const out = reverseSurfaceNormal.clone().applyAxisAngle(rotationAxis, refractAngle);
-  // console.log("out", out);
   return out;
 };
 

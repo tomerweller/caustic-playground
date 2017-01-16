@@ -21,8 +21,8 @@
 			"type": "PlaneBufferGeometry",
 			"width": 30,
 			"height": 30,
-			"widthSegments": 50,
-			"heightSegments": 50
+			"widthSegments": 150,
+			"heightSegments": 150
 		}],
 	"materials": [
 		{
