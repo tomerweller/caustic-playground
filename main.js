@@ -37,7 +37,7 @@ const initScene = loadedScene => {
 
     stats = new Stats();
     container.appendChild( stats.dom );
-    controls = new THREE.OrbitControls( camera, renderer.domElement );
+    const controls = new THREE.OrbitControls( camera, renderer.domElement );
     controls.target.set( 0, 0, 0 );
     controls.update();
     initSettings();
@@ -61,6 +61,7 @@ const animate = () => {
 
 const render = () => {
     light.castShadow = settings.lightPointCastShadows;
+    ball.material.opacity = settings.refractiveOpacity;
     renderer.render( scene, camera );
 };
 
@@ -80,25 +81,8 @@ const projectFacesBallWall = pf => {
     }, []);
 };
 
-const getCausticMap = (origin, refractive, receiver, outIOR, inIOR) => {
-    const start = performance.now();
-    console.log("0", performance.now() - start);
-    const  refractiveProjectedFaces = refractOnSelf(ball, origin, outIOR, inIOR);
-    console.log("1", performance.now() - start);
-    const receiverProjectedFaces = refractOnOther(refractiveProjectedFaces, refractive, receiver, inIOR, outIOR);
-    console.log("2", performance.now()-start);
-    const causticMap = {};
-    receiverProjectedFaces.forEach(f => {
-        if (!(f.faceIndex in causticMap)){
-            causticMap[f.faceIndex] = 0;
-        }
-        causticMap[f.faceIndex]+=1;
-    });
-    console.log("3", performance.now()-start);
-    return causticMap;
-};
-
 const getMainCausticMap = () => getCausticMap(light.position, ball, floor, RINDEX_AIR, RINDEX_GLASS);
+
 const applyCaustics = (causticMap, fnGetter) => {
     const max = Object.keys(causticMap).reduce((currMax,i) => {
         return causticMap[i]>currMax? causticMap[i]: currMax;
@@ -108,7 +92,7 @@ const applyCaustics = (causticMap, fnGetter) => {
     const fn = fnGetter(max);
 
     const color = new Float32Array(floor.geometry.attributes.position.count*3);
-    for(face of faceIterator(floor.geometry, floor.position)) {
+    for(face of faceIterator(floor.geometry, floor.matrixWorld)) {
         const val = face.index in causticMap ? fn(causticMap[face.index]) : 0;
         [0,1,2]
             .map(i => floorGeometry.index.array[3*face.index+i])
@@ -127,21 +111,26 @@ const getLinearFn = max => x => x/max;
 const getQuadraticFn = max => x => Math.pow(x/max,2);
 
 const testCaustics = () => {
-    const map = getCausticMap();
-    applyCaustics(map, getArctanFn);
+    window.map = perf(getMainCausticMap);
+
+    //HACK!
+    window.directFaces.forEach(faceIndex => window.map[faceIndex] = faceIndex in window.map? window.map[faceIndex]+1: 0);
+
+    applyCaustics(window.map, getArctanFn);
 };
 
-loader.load( "plane-scene.json", initScene);
+loader.load( "scene.json", initScene);
 window.addEventListener( 'resize', onWindowResize, false );
 
 const settings = {
-    lightPointCastShadows: true,
+    refractiveOpacity: 0.5,
+    lightPointCastShadows: false,
     testCaustics: testCaustics
 };
 
 const initSettings = () => {
     const gui = new dat.GUI();
     gui.add(settings, 'lightPointCastShadows');
+    gui.add(settings, 'refractiveOpacity', 0, 1);
     gui.add(settings, 'testCaustics');
 };
-

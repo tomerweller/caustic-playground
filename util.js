@@ -3,10 +3,10 @@ const RINDEX_GLASS = 1.52;
 const EQUALITY_THRESHEOLD = 0.01;
 
 const perf = (fn) => {
-  const t0 = performance.now();
+  console.log(`running ${fn.name} with performance test`);
+  const startTime = performance.now();
   const retval = fn();
-  const t1 = performance.now();
-  console.log("Call to fn took " + (t1 - t0)/1000 + " seconds.");
+  console.log(`${fn.name} took ${(performance.now() - startTime)/1000 } seconds.`);
   return retval;
 };
 
@@ -45,14 +45,16 @@ const refract = (surfaceNormal, inRay, inIOR, outIOR) => {
  *
  * @param geometry
  * @param faceIndex
- * @param offset
+ * @param matrixWorld
  * @returns {{index: *, normal: (XML|XMLList|string|*), vertexPositions: Array}}
  */
-const faceInBufferedGeometry = (geometry, faceIndex, offset) => {
+const faceInBufferedGeometry = (geometry, faceIndex, matrixWorld) => {
   const vertexPositions = [0,1,2]
     .map(i => geometry.index.array[3*faceIndex+i])
     .map(vertexIndex =>
-      new THREE.Vector3().fromBufferAttribute( geometry.attributes.position, vertexIndex).add(offset));
+      new THREE.Vector3().fromBufferAttribute( geometry.attributes.position, vertexIndex).applyMatrix4(matrixWorld));
+
+
   const  normal = new THREE.Vector3().crossVectors(
     new THREE.Vector3().subVectors(vertexPositions[1], vertexPositions[0]),
     new THREE.Vector3().subVectors(vertexPositions[2], vertexPositions[0])
@@ -70,11 +72,11 @@ const faceInBufferedGeometry = (geometry, faceIndex, offset) => {
  * @param offset
  * @returns {{}}
  */
-const faceIterator = (geometry, offset) => { //for meshes with buffered geometry
+const faceIterator = (geometry, matrixWorld) => { //for meshes with buffered geometry
   const iterable = {};
   iterable[Symbol.iterator] = function* () {
     for (let i=0; i<(geometry.index.count/3); i++) {
-      yield faceInBufferedGeometry(geometry, i, offset);
+      yield faceInBufferedGeometry(geometry, i, matrixWorld);
     }
   };
   return iterable;
@@ -123,7 +125,7 @@ const refractFaceOnSelf = (face, mesh, lightOrigin, inIOR, outIOR) => {
  */
 const refractOnSelf = (mesh, lightOrigin, inIOR, outIOR) => {
   let projectedFaces = [];
-  for (let face of faceIterator(mesh.geometry, mesh.position)) {
+  for (let face of faceIterator(mesh.geometry, mesh.matrixWorld)) {
     for (let projectedFace of refractFaceOnSelf(face, mesh, lightOrigin, inIOR, outIOR)) {
       projectedFaces.push(projectedFace);
     }
@@ -143,7 +145,7 @@ const refractOnSelf = (mesh, lightOrigin, inIOR, outIOR) => {
 const projectOnOther = (faceOrigin, originMesh, targetMesh, inIOR, outIOR) => {
   const vertices = [faceOrigin.face.a, faceOrigin.face.b, faceOrigin.face.c]
     .map(v => new THREE.Vector3()
-      .fromBufferAttribute(originMesh.geometry.attributes.position, v).add(originMesh.position));
+      .fromBufferAttribute(originMesh.geometry.attributes.position, v).applyMatrix4(originMesh.matrixWorld));
   return vertices.reduce( (prev, v) => {
     const ray = refract(faceOrigin.face.normal.clone().multiplyScalar(-1),
       faceOrigin.ray.clone().multiplyScalar(-1), inIOR, outIOR);
@@ -171,3 +173,43 @@ const refractOnOther = (faceOrigins, originMesh, targetMesh, inIOR, outIOR) => {
   return projectedFaces;
 };
 
+
+const getDirectFaces = (lightOrigin, mesh, interference) => {
+  let projectedFaces = [];
+  for (let face of faceIterator(mesh.geometry, mesh.matrixWorld)) {
+    const lightDirections = face.vertexPositions.map(position => position.clone().sub(lightOrigin).normalize());
+    const isInterfered = lightDirections.reduce((prev, lightDirection) => {
+      const isecs = raycast(lightOrigin, lightDirection, interference);
+      return prev && isecs.length>0;
+    }, true);
+    if (!isInterfered) {
+        projectedFaces.push(face.index);
+    }
+  }
+  return projectedFaces;
+};
+
+
+/**
+ *
+ * @param origin
+ * @param refractive
+ * @param receiver
+ * @param outIOR
+ * @param inIOR
+ * @returns {{}}
+ */
+const getCausticMap = (origin, refractive, receiver, outIOR, inIOR) => {
+  const refractiveProjectedFaces = refractOnSelf(ball, origin, outIOR, inIOR);
+  const receiverProjectedFaces = refractOnOther(refractiveProjectedFaces, refractive, receiver, inIOR, outIOR);
+  const causticMap = {};
+  receiverProjectedFaces.forEach(f =>
+    causticMap[f.faceIndex] = f.faceIndex in causticMap? causticMap[f.faceIndex]+1: 0);
+
+  const directFaces = getDirectFaces(origin, receiver, refractive);
+  window.directFaces = directFaces;
+  console.log("directFaces", directFaces);
+  directFaces.forEach(faceIndex => causticMap[faceIndex] = faceIndex in causticMap? causticMap[faceIndex]+1: 0);
+
+  return causticMap;
+};
