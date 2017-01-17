@@ -106,7 +106,7 @@
 			{
 				"uuid": "3B93E6CE-3281-4301-AC3B-D22F524C45DB",
 				"type": "AmbientLight",
-				"name": "AmbientLight 1",
+				"name": "AmbientLight",
 				"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
 				"color": 2236962,
 				"intensity": 15
